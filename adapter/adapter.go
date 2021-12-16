@@ -1,13 +1,25 @@
 package adapter
 
-import "errors"
+import (
+	"errors"
+)
 
 type adapter struct {
 	r sedRunner
 }
 
-func New(rex string) (*adapter, error) {
-	r, err := NewStringRunner(rex)
+func NewString(rex string) (*adapter, error) {
+	r, err := newStringRunner(rex)
+
+	if err != nil {
+		return nil, err
+	} else {
+		return &adapter{r}, err
+	}
+}
+
+func NewFile(rf string, rp string) (*adapter, error) {
+	r, err := NewPoFileRunner(rf, rp)
 
 	if err != nil {
 		return nil, err

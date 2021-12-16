@@ -1,18 +1,37 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/softcatala/adaptago/adapter"
 	"net/http"
 )
 
 type incoming struct {
-	original string `json:"original" binding:"required"`
+	Original string `json:"original" binding:"required"`
 }
 
 func main() {
 
-	adaptgo, _ := adapter.New("")
+	regexpFile := flag.String("file", "", "File with regular expressions")
+	poFile := flag.String("po", "", "File with template PO file")
+
+	flag.Parse()
+
+	if *regexpFile == "" {
+		panic("Missing regexp file argument")
+	}
+
+	if *poFile == "" {
+		panic("Missing po file argument")
+	}
+
+	fileAdapter, err := adapter.NewFile(*regexpFile, *poFile)
+
+	if err != nil {
+		panic(fmt.Sprintf("Could not load adapter: %v", err))
+	}
 
 	r := gin.Default()
 
@@ -23,7 +42,7 @@ func main() {
 		sed := c.Query("sed")
 		i := c.Query("input")
 
-		adaptgo, err := adapter.New(sed)
+		adaptgo, err := adapter.NewString(sed)
 
 		var result *adapter.Result
 		if err == nil || result == nil {
@@ -42,14 +61,12 @@ func main() {
 		var i incoming
 		c.BindJSON(&i)
 
-		result, err := adaptgo.Adapt(i.original)
-		if err != nil {
+		result, err := fileAdapter.Adapt(i.Original)
+		if err == nil {
 			c.JSON(http.StatusOK, gin.H{"original": result.Original, "adapted": result.Adapted})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"original": result.Original, "error": err})
 		}
-
-		c.String(200, "welcome!")
 	})
 
 	r.Run(":8080")

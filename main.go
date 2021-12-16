@@ -40,7 +40,7 @@ func main() {
 	r.GET("/string", func(c *gin.Context) {
 
 		sed := c.Query("sed")
-		i := c.Query("input")
+		i := c.Query("original")
 
 		adaptgo, err := adapter.NewString(sed)
 
@@ -62,6 +62,18 @@ func main() {
 		c.BindJSON(&i)
 
 		result, err := fileAdapter.Adapt(i.Original)
+		if err == nil {
+			c.JSON(http.StatusOK, gin.H{"original": result.Original, "adapted": result.Adapted})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"original": result.Original, "error": err})
+		}
+	})
+
+	r.GET("/po", func(c *gin.Context) {
+
+		o := c.Query("original")
+
+		result, err := fileAdapter.Adapt(o)
 		if err == nil {
 			c.JSON(http.StatusOK, gin.H{"original": result.Original, "adapted": result.Adapted})
 		} else {

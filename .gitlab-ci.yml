@@ -1,5 +1,13 @@
+include:
+  - project: 'docker/process-webhooks'
+    file: '/gitlab/deploy.yml'
+
+variables:
+  PROJECT_TO_BE_DEPLOYED: 'docker/apertium'
+
 stages:
   - build
+  - deploy
 
 build:
   image: docker:latest
@@ -14,3 +22,9 @@ build:
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:$DATETAG
     - docker push $CI_REGISTRY_IMAGE:latest
+
+deploy:
+  stage: deploy
+  extends:
+    .default-deploy
+  when: manual

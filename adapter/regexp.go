@@ -1,26 +1,32 @@
 package adapter
 
 import (
+	"errors"
 	"github.com/rwtodd/Go.Sed/sed"
 	"strings"
 )
 
-type stringRunner struct {
+type Regexp struct {
 	e *sed.Engine
 }
 
-func newStringRunner(r string) (sedRunner, error) {
+func NewRegexp(r string) (*Regexp, error) {
+
+	if r == "" {
+		return nil, errors.New("Regexp is empty")
+	}
+
 	e, err := sed.New(strings.NewReader(r))
 
 	if err != nil {
 		return nil, err
 	} else {
-		return &stringRunner{e}, nil
+		return &Regexp{e}, nil
 	}
 }
 
-func (s *stringRunner) run(i string) (string, error) {
-	o, err := s.e.RunString(i)
+func (r *Regexp) AdaptString(t string) (string, error) {
+	o, err := r.e.RunString(t)
 
 	if err != nil {
 		return "", err

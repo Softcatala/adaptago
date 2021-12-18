@@ -4,7 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/leonelquinteros/gotext"
 	"github.com/softcatala/adaptago/adapter"
+	"github.com/softcatala/adaptago/handlers"
+	adapterpo "github.com/softcatala/adaptago/po"
 	"net/http"
 )
 
@@ -27,59 +30,74 @@ func main() {
 		panic("Missing po file argument")
 	}
 
-	fileAdapter, err := adapter.NewFile(*regexpFile, *poFile)
+	valencianitzador, err := adapter.NewValencianitzador(*regexpFile)
 
 	if err != nil {
-		panic(fmt.Sprintf("Could not load adapter: %v", err))
+		panic(fmt.Sprintf("Could not load valencianitzador: %v", err))
 	}
+
+	poWrapper, err := adapterpo.NewWrapper(*poFile)
 
 	r := gin.Default()
 
 	r.SetTrustedProxies(nil)
 
-	r.GET("/string", func(c *gin.Context) {
+	r.GET("/valencia", func(c *gin.Context) {
 
-		sed := c.Query("sed")
-		i := c.Query("original")
+		t := c.Query("original")
 
-		adaptgo, err := adapter.NewString(sed)
-
-		var result *adapter.Result
-		if err == nil || result == nil {
-			result, err = adaptgo.Adapt(i)
+		if t == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "No text provided (original query param)"})
+			return
 		}
 
-		if err == nil {
-			c.JSON(http.StatusOK, gin.H{"original": result.Original, "adapted": result.Adapted})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"original": result.Original, "error": err})
+		o, err := poWrapper.Execute(t, valencianitzador.AdaptPo)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"original": t, "error": err})
+			return
 		}
+
+		c.JSON(http.StatusOK, gin.H{"original": t, "adapted": o})
+		return
 	})
 
-	r.POST("/po", func(c *gin.Context) {
+	r.POST("/valencia", func(c *gin.Context) {
 
-		var i incoming
-		c.BindJSON(&i)
+		body, err := c.GetRawData()
 
-		result, err := fileAdapter.Adapt(i.Original)
-		if err == nil {
-			c.JSON(http.StatusOK, gin.H{"original": result.Original, "adapted": result.Adapted})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"original": result.Original, "error": err})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Po content is invalid", "error": err})
+			return
 		}
+
+		if string(body) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Po content is empty"})
+			return
+		}
+
+		po := gotext.NewPo()
+		po.Parse(body)
+
+		po, err = valencianitzador.AdaptPo(po)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			return
+		}
+
+		out, err := po.MarshalText()
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			return
+		}
+
+		c.Data(http.StatusOK, gin.MIMEPlain, out)
+		return
 	})
 
-	r.GET("/po", func(c *gin.Context) {
-
-		o := c.Query("original")
-
-		result, err := fileAdapter.Adapt(o)
-		if err == nil {
-			c.JSON(http.StatusOK, gin.H{"original": result.Original, "adapted": result.Adapted})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"original": result.Original, "error": err})
-		}
-	})
+	r.GET("/replace", handlers.ReplaceString)
 
 	r.Run(":8080")
 }
